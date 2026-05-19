@@ -34,6 +34,7 @@ log/
 .ruff_cache/
 .gradio/
 .history/
+.firecrawl/
 temp/
 
 # IDE / Editor Files
