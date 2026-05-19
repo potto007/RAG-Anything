@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, BarChart3, Eye, FilePlus2, Loader2, Play, RefreshCw } from 'lucide-react'
+import { Activity, AlertCircle, BarChart3, ChevronDown, ChevronUp, Eye, FilePlus2, Loader2, Play, RefreshCw } from 'lucide-react'
 import { getDocuments, processDocument } from '../api/client'
 import { StatusBadge } from '../components/StatusBadge'
 import type { DocumentRecord, DocumentStatus } from '../types/studio'
@@ -25,6 +25,7 @@ export default function DocumentsPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [showPipeline, setShowPipeline] = useState(false)
   const { data: documents = [], isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['documents'],
     queryFn: getDocuments,
@@ -41,6 +42,8 @@ export default function DocumentsPage() {
     },
   })
   const counts = useMemo(() => countDocuments(documents), [documents])
+  const activeJobs = useMemo(() => documents.filter((d) => d.status === 'processing'), [documents])
+  const recentFailed = useMemo(() => documents.filter((d) => d.status === 'failed'), [documents])
   const filteredDocuments = statusFilter === 'all'
     ? documents
     : documents.filter((doc) => doc.status === statusFilter)
@@ -54,8 +57,19 @@ export default function DocumentsPage() {
 
         <div className="documents-toolbar">
           <div className="documents-toolbar-group">
-            <button className="icon-button" type="button" onClick={() => refetch()} disabled={isFetching} title="Refresh document list">
+            <button className="button" type="button" onClick={() => refetch()} disabled={isFetching}>
               <RefreshCw size={16} className={isFetching ? 'spin' : ''} />
+              Scan
+            </button>
+            <button
+              className={`button${showPipeline ? ' active' : ''}`}
+              type="button"
+              onClick={() => setShowPipeline((v) => !v)}
+            >
+              <Activity size={16} />
+              Pipeline Status
+              {activeJobs.length > 0 ? <span className="toolbar-badge">{activeJobs.length}</span> : null}
+              {showPipeline ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
           </div>
           <div className="documents-toolbar-group">
@@ -65,6 +79,10 @@ export default function DocumentsPage() {
             </Link>
           </div>
         </div>
+
+        {showPipeline ? (
+          <PipelineStatusPanel activeJobs={activeJobs} recentFailed={recentFailed} />
+        ) : null}
 
         <div className="documents-inner-card">
           <div className="documents-inner-header">
@@ -227,5 +245,67 @@ function DocumentDetail({ doc }: { doc: DocumentRecord }) {
       <span className="doc-detail__line">Not processed</span>
       <small>{doc.status_detail ?? 'Upload complete; processing has not started'}</small>
     </span>
+  )
+}
+
+function PipelineStatusPanel({
+  activeJobs,
+  recentFailed,
+}: {
+  activeJobs: DocumentRecord[]
+  recentFailed: DocumentRecord[]
+}) {
+  return (
+    <div className="pipeline-status-panel">
+      <div className="pipeline-section">
+        <h3>Active Processing ({activeJobs.length})</h3>
+        {activeJobs.length === 0 ? (
+          <p className="pipeline-empty">No documents currently processing</p>
+        ) : (
+          <div className="pipeline-jobs">
+            {activeJobs.map((doc) => {
+              const progress = Math.round((doc.latest_job_progress ?? 0) * 100)
+              return (
+                <div className="pipeline-job" key={doc.id}>
+                  <div className="pipeline-job-header">
+                    <strong>{doc.filename}</strong>
+                    <span className="pipeline-job-stage">{doc.latest_job_stage ?? 'processing'}</span>
+                  </div>
+                  <div className="pipeline-job-bar">
+                    <div className="pipeline-job-fill" style={{ width: `${progress}%` }} />
+                  </div>
+                  <div className="pipeline-job-footer">
+                    <small>{doc.latest_job_message ?? `${progress}% complete`}</small>
+                    {doc.latest_job_id ? (
+                      <Link className="pipeline-job-link" to={`/jobs/${doc.latest_job_id}`}>View job</Link>
+                    ) : null}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {recentFailed.length > 0 ? (
+        <div className="pipeline-section pipeline-section--failed">
+          <h3>Failed ({recentFailed.length})</h3>
+          <div className="pipeline-jobs">
+            {recentFailed.map((doc) => (
+              <div className="pipeline-job pipeline-job--failed" key={doc.id}>
+                <div className="pipeline-job-header">
+                  <strong>{doc.filename}</strong>
+                  <AlertCircle size={14} />
+                </div>
+                <small>{doc.status_detail ?? doc.error ?? 'Unknown error'}</small>
+                {doc.latest_job_id ? (
+                  <Link className="pipeline-job-link" to={`/jobs/${doc.latest_job_id}`}>View error</Link>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
   )
 }

@@ -1847,6 +1847,121 @@ textarea { resize: vertical; }
   flex-wrap: wrap;
 }
 
+.toolbar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.pipeline-status-panel {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface, var(--bg-card));
+}
+
+.pipeline-section h3 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+.pipeline-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.pipeline-jobs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pipeline-job {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg-inset, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border);
+}
+
+.pipeline-job--failed {
+  border-color: var(--red, #e74c3c);
+}
+
+.pipeline-job-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.pipeline-job-header strong {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pipeline-job-stage {
+  font-size: 11px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.pipeline-job-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-inset, rgba(255, 255, 255, 0.06));
+  margin: 4px 0;
+  overflow: hidden;
+}
+
+.pipeline-job-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.pipeline-job-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pipeline-job-footer small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.pipeline-job-link {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pipeline-job-link:hover {
+  text-decoration: underline;
+}
+
 .documents-inner-card {
   min-height: 0;
   flex: 1;
