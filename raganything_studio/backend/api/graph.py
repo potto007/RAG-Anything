@@ -10,7 +10,15 @@ from fastapi.responses import FileResponse
 from raganything_studio.backend.core.errors import api_error
 from raganything_studio.backend.core.settings_store import SettingsStore
 from raganything_studio.backend.dependencies import get_rag_service, get_settings_store, settings as studio_settings
-from raganything_studio.backend.schemas.graph import GraphLabelsResponse, KnowledgeGraphResponse
+from raganything_studio.backend.schemas.graph import (
+    DeleteEntityRequest,
+    DeleteRelationRequest,
+    DeletionResponse,
+    GraphLabelsResponse,
+    KnowledgeGraphResponse,
+    MergeEntitiesRequest,
+    MergeEntitiesResponse,
+)
 from raganything_studio.backend.services.raganything_service import RAGAnythingService
 
 router = APIRouter()
@@ -145,6 +153,106 @@ async def get_subgraph(
         raise api_error(
             "GRAPH_FETCH_FAILED",
             f"Failed to fetch knowledge graph: {exc}",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        ) from exc
+
+
+async def _get_lightrag(
+    rag_service: RAGAnythingService,
+    settings_store: SettingsStore,
+    profile_id: str | None = None,
+) -> object:
+    settings = settings_store.get()
+    rag = await rag_service.get_rag(profile_id=profile_id or settings.active_profile_id)
+    initializer = getattr(rag, "_ensure_lightrag_initialized", None)
+    if callable(initializer):
+        await initializer()
+    lightrag = getattr(rag, "lightrag", None)
+    if lightrag is None:
+        raise api_error(
+            "GRAPH_NOT_AVAILABLE",
+            "LightRAG instance is not available",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    return lightrag
+
+
+@router.post("/entities/delete", response_model=DeletionResponse)
+async def delete_entity(
+    request: DeleteEntityRequest,
+    profile_id: str | None = Query(default=None),
+    rag_service: RAGAnythingService = Depends(get_rag_service),
+    settings_store: SettingsStore = Depends(get_settings_store),
+) -> DeletionResponse:
+    try:
+        lightrag = await _get_lightrag(rag_service, settings_store, profile_id)
+        result = await lightrag.adelete_by_entity(request.entity_name)
+        return DeletionResponse(
+            status=result.status,
+            message=result.message,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise api_error(
+            "DELETE_ENTITY_FAILED",
+            f"Failed to delete entity: {exc}",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        ) from exc
+
+
+@router.post("/relations/delete", response_model=DeletionResponse)
+async def delete_relation(
+    request: DeleteRelationRequest,
+    profile_id: str | None = Query(default=None),
+    rag_service: RAGAnythingService = Depends(get_rag_service),
+    settings_store: SettingsStore = Depends(get_settings_store),
+) -> DeletionResponse:
+    try:
+        lightrag = await _get_lightrag(rag_service, settings_store, profile_id)
+        result = await lightrag.adelete_by_relation(
+            request.source_entity, request.target_entity
+        )
+        return DeletionResponse(
+            status=result.status,
+            message=result.message,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise api_error(
+            "DELETE_RELATION_FAILED",
+            f"Failed to delete relation: {exc}",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        ) from exc
+
+
+@router.post("/entities/merge", response_model=MergeEntitiesResponse)
+async def merge_entities(
+    request: MergeEntitiesRequest,
+    profile_id: str | None = Query(default=None),
+    rag_service: RAGAnythingService = Depends(get_rag_service),
+    settings_store: SettingsStore = Depends(get_settings_store),
+) -> MergeEntitiesResponse:
+    try:
+        lightrag = await _get_lightrag(rag_service, settings_store, profile_id)
+        result = await lightrag.amerge_entities(
+            source_entities=request.source_entities,
+            target_entity=request.target_entity,
+            merge_strategy=request.merge_strategy,
+            target_entity_data=request.target_entity_data,
+        )
+        return MergeEntitiesResponse(
+            status="success",
+            message=f"Merged {len(request.source_entities)} entities into '{request.target_entity}'",
+            entity=result,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise api_error(
+            "MERGE_ENTITIES_FAILED",
+            f"Failed to merge entities: {exc}",
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         ) from exc
 

@@ -312,6 +312,24 @@ export interface GraphLabelsResponse {
   labels: string[]
 }
 
+export interface DeletionResponse {
+  status: string
+  message: string
+}
+
+export interface MergeEntitiesRequest {
+  source_entities: string[]
+  target_entity: string
+  merge_strategy?: Record<string, string> | null
+  target_entity_data?: Record<string, unknown> | null
+}
+
+export interface MergeEntitiesResponse {
+  status: string
+  message: string
+  entity?: Record<string, unknown> | null
+}
+
 export interface StudioSettingsUpdate {
   data_dir?: string | null
   upload_dir?: string | null

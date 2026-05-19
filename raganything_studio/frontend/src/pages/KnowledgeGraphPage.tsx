@@ -19,13 +19,15 @@ import {
   Layers,
   LocateFixed,
   Maximize2,
+  Merge,
   RefreshCw,
   Search,
   Settings as SettingsIcon,
+  Trash2,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
-import { getGraphLabels, getGraphSubgraph } from '../api/client'
+import { deleteEntity, deleteRelation, getGraphLabels, getGraphSubgraph, mergeEntities } from '../api/client'
 import type { GraphEdge, GraphNode, KnowledgeGraphResponse } from '../types/studio'
 
 import '@react-sigma/core/lib/style.css'
@@ -402,9 +404,68 @@ export default function KnowledgeGraphPage() {
     setLayoutTrigger((prev) => ({ name, seq: prev.seq + 1 }))
   }
 
+  const [mergeSelection, setMergeSelection] = useState<Set<string>>(new Set())
+  const [mergeMode, setMergeMode] = useState(false)
+  const [mergeTargetName, setMergeTargetName] = useState('')
+
+  const deleteMutation = useMutation({
+    mutationFn: async (params: { kind: 'node'; entityName: string } | { kind: 'edge'; source: string; target: string }) => {
+      if (params.kind === 'node') return deleteEntity(params.entityName)
+      return deleteRelation(params.source, params.target)
+    },
+    onSuccess: () => {
+      setSelected(null)
+      reloadGraph()
+    },
+  })
+
+  const mergeMutation = useMutation({
+    mutationFn: async (params: { sourceEntities: string[]; targetEntity: string }) => {
+      return mergeEntities({
+        source_entities: params.sourceEntities,
+        target_entity: params.targetEntity,
+      })
+    },
+    onSuccess: () => {
+      setMergeSelection(new Set())
+      setMergeMode(false)
+      setMergeTargetName('')
+      setSelected(null)
+      reloadGraph()
+    },
+  })
+
+  function handleDeleteNode(entityName: string) {
+    if (!confirm(`Delete entity "${entityName}" and all its relationships?`)) return
+    deleteMutation.mutate({ kind: 'node', entityName })
+  }
+
+  function handleDeleteEdge(source: string, target: string) {
+    if (!confirm(`Delete relation "${source}" -> "${target}"?`)) return
+    deleteMutation.mutate({ kind: 'edge', source, target })
+  }
+
+  function toggleMergeSelect(nodeId: string) {
+    setMergeSelection((prev) => {
+      const next = new Set(prev)
+      if (next.has(nodeId)) next.delete(nodeId)
+      else next.add(nodeId)
+      return next
+    })
+  }
+
+  function handleMerge() {
+    const sources = [...mergeSelection]
+    const target = mergeTargetName.trim() || sources[0]
+    if (sources.length < 2) return
+    if (!confirm(`Merge ${sources.length} entities into "${target}"?`)) return
+    mergeMutation.mutate({ sourceEntities: sources, targetEntity: target })
+  }
+
   const isLoading = labelsLoading || graphLoading || expandMutation.isPending
   const selectedNode = selected?.kind === 'node' ? selected.node : null
   const selectedEdge = selected?.kind === 'edge' ? selected.edge : null
+  const isMutating = deleteMutation.isPending || mergeMutation.isPending
 
   return (
     <div ref={containerRef} className="graph-workspace">
@@ -518,6 +579,14 @@ export default function KnowledgeGraphPage() {
           >
             <SettingsIcon size={15} />
           </button>
+          <div className="graph-toolbar-sep" />
+          <button
+            className={`graph-icon-btn${mergeMode ? ' active' : ''}`}
+            title="Merge mode - select entities to merge"
+            onClick={() => { setMergeMode((v) => !v); if (mergeMode) { setMergeSelection(new Set()); setMergeTargetName('') } }}
+          >
+            <Merge size={15} />
+          </button>
         </div>
 
         {/* ── Settings popover ── */}
@@ -582,14 +651,49 @@ export default function KnowledgeGraphPage() {
                   node={selectedNode}
                   info={nodeInfoRef.current.get(selectedNode.id)}
                   onClose={onClearSelection}
+                  onDelete={handleDeleteNode}
+                  isDeleting={deleteMutation.isPending}
+                  mergeMode={mergeMode}
+                  mergeSelected={mergeSelection.has(selectedNode.id)}
+                  onToggleMerge={() => toggleMergeSelect(selectedNode.id)}
                 />
               : selectedEdge
                 ? <EdgeProperties
                     edge={selectedEdge}
                     edgeType={edgeTypeRef.current.get(selectedEdge.id) ?? normalizeEdgeType(selectedEdge)}
                     onClose={onClearSelection}
+                    onDelete={handleDeleteEdge}
+                    isDeleting={deleteMutation.isPending}
                   />
                 : null}
+          </div>
+        )}
+
+        {/* ── Merge toolbar ── */}
+        {mergeMode && (
+          <div className="graph-merge-toolbar">
+            <span className="graph-merge-count">{mergeSelection.size} selected</span>
+            <input
+              className="graph-merge-input"
+              value={mergeTargetName}
+              onChange={(e) => setMergeTargetName(e.target.value)}
+              placeholder="Target entity name (default: first)"
+            />
+            <button
+              className="graph-merge-btn"
+              type="button"
+              disabled={mergeSelection.size < 2 || mergeMutation.isPending}
+              onClick={handleMerge}
+            >
+              {mergeMutation.isPending ? 'Merging...' : 'Merge'}
+            </button>
+            <button
+              className="graph-merge-cancel"
+              type="button"
+              onClick={() => { setMergeMode(false); setMergeSelection(new Set()); setMergeTargetName('') }}
+            >
+              Cancel
+            </button>
           </div>
         )}
 
@@ -621,10 +725,10 @@ export default function KnowledgeGraphPage() {
         </div>
 
         {/* ── Loading overlay ── */}
-        {isLoading && (
+        {(isLoading || isMutating) && (
           <div className="graph-loading-overlay">
             <div className="graph-spinner" />
-            <p>Loading graph…</p>
+            <p>{isMutating ? 'Updating graph...' : 'Loading graph...'}</p>
           </div>
         )}
 
@@ -645,10 +749,20 @@ function NodeProperties({
   node,
   info,
   onClose,
+  onDelete,
+  isDeleting,
+  mergeMode,
+  mergeSelected,
+  onToggleMerge,
 }: {
   node: GraphNode
   info: { type: NodeType; degree: number } | undefined
   onClose: () => void
+  onDelete: (entityName: string) => void
+  isDeleting: boolean
+  mergeMode: boolean
+  mergeSelected: boolean
+  onToggleMerge: () => void
 }) {
   const nodeType = info?.type ?? 'entity'
   const color = NODE_COLORS[nodeType]
@@ -666,7 +780,7 @@ function NodeProperties({
     <div className="graph-props-card">
       <div className="graph-props-header">
         <h3 className="graph-props-title graph-props-title--node">Node Properties</h3>
-        <button className="graph-props-close" onClick={onClose}>×</button>
+        <button className="graph-props-close" onClick={onClose}>x</button>
       </div>
 
       <div className="graph-props-meta-grid">
@@ -676,7 +790,7 @@ function NodeProperties({
         </div>
         <div className="graph-props-meta-cell">
           <small>Degree</small>
-          <strong>{info?.degree ?? '—'}</strong>
+          <strong>{info?.degree ?? '-'}</strong>
         </div>
       </div>
 
@@ -728,6 +842,28 @@ function NodeProperties({
             </div>
           </div>
         )}
+
+        <div className="graph-props-actions">
+          {mergeMode && (
+            <button
+              className={`graph-props-action-btn graph-props-action-btn--merge${mergeSelected ? ' active' : ''}`}
+              type="button"
+              onClick={onToggleMerge}
+            >
+              <Merge size={14} />
+              {mergeSelected ? 'Selected for merge' : 'Select for merge'}
+            </button>
+          )}
+          <button
+            className="graph-props-action-btn graph-props-action-btn--delete"
+            type="button"
+            disabled={isDeleting}
+            onClick={() => onDelete(node.id)}
+          >
+            <Trash2 size={14} />
+            {isDeleting ? 'Deleting...' : 'Delete entity'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -737,10 +873,14 @@ function EdgeProperties({
   edge,
   edgeType,
   onClose,
+  onDelete,
+  isDeleting,
 }: {
   edge: GraphEdge
   edgeType: string
   onClose: () => void
+  onDelete: (source: string, target: string) => void
+  isDeleting: boolean
 }) {
   const entries = Object.entries(edge.properties)
     .filter(([k]) => k !== 'created_at' && k !== 'truncate')
@@ -750,7 +890,7 @@ function EdgeProperties({
     <div className="graph-props-card">
       <div className="graph-props-header">
         <h3 className="graph-props-title graph-props-title--edge">Edge Properties</h3>
-        <button className="graph-props-close" onClick={onClose}>×</button>
+        <button className="graph-props-close" onClick={onClose}>x</button>
       </div>
 
       <div className="graph-props-scrollbody">
@@ -764,7 +904,7 @@ function EdgeProperties({
         </div>
 
         <div className="graph-props-kv-section">
-          <div className="graph-props-section-label">Source → Target</div>
+          <div className="graph-props-section-label">Source {'>'} Target</div>
           <div className="graph-props-kv-list">
             <div className="graph-props-kv-row">
               <span className="graph-props-kv-key">from</span>
@@ -790,6 +930,18 @@ function EdgeProperties({
             </div>
           </div>
         )}
+
+        <div className="graph-props-actions">
+          <button
+            className="graph-props-action-btn graph-props-action-btn--delete"
+            type="button"
+            disabled={isDeleting}
+            onClick={() => onDelete(edge.source, edge.target)}
+          >
+            <Trash2 size={14} />
+            {isDeleting ? 'Deleting...' : 'Delete relation'}
+          </button>
+        </div>
       </div>
     </div>
   )

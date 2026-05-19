@@ -3,6 +3,7 @@ import type {
   ConnectionTestRequest,
   ConnectionTestResponse,
   ContentListResponse,
+  DeletionResponse,
   DocumentRecord,
   EnvironmentResponse,
   GraphLabelsResponse,
@@ -10,6 +11,8 @@ import type {
   InstallDepResponse,
   JobRecord,
   KnowledgeGraphResponse,
+  MergeEntitiesRequest,
+  MergeEntitiesResponse,
   ModelListRequest,
   ModelListResponse,
   ProcessOptions,
@@ -161,4 +164,38 @@ export async function getGraphSubgraph(
   if (nodeLabel) params.set('node_label', nodeLabel)
   if (profileId) params.set('profile_id', profileId)
   return request<KnowledgeGraphResponse>(`/api/graph/subgraph?${params}`)
+}
+
+export async function deleteEntity(
+  entityName: string,
+  profileId?: string | null,
+): Promise<DeletionResponse> {
+  const params = profileId ? `?profile_id=${encodeURIComponent(profileId)}` : ''
+  return request<DeletionResponse>(`/api/graph/entities/delete${params}`, {
+    body: JSON.stringify({ entity_name: entityName }),
+    method: 'POST',
+  })
+}
+
+export async function deleteRelation(
+  sourceEntity: string,
+  targetEntity: string,
+  profileId?: string | null,
+): Promise<DeletionResponse> {
+  const params = profileId ? `?profile_id=${encodeURIComponent(profileId)}` : ''
+  return request<DeletionResponse>(`/api/graph/relations/delete${params}`, {
+    body: JSON.stringify({ source_entity: sourceEntity, target_entity: targetEntity }),
+    method: 'POST',
+  })
+}
+
+export async function mergeEntities(
+  payload: MergeEntitiesRequest,
+  profileId?: string | null,
+): Promise<MergeEntitiesResponse> {
+  const params = profileId ? `?profile_id=${encodeURIComponent(profileId)}` : ''
+  return request<MergeEntitiesResponse>(`/api/graph/entities/merge${params}`, {
+    body: JSON.stringify(payload),
+    method: 'POST',
+  })
 }
