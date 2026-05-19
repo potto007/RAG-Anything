@@ -93,6 +93,12 @@ SUPPORTED_STORAGE_COMBINATIONS = {
         "MemgraphStorage",
         "JsonDocStatusStorage",
     ),
+    (
+        "RedisKVStorage",
+        "MilvusVectorDBStorage",
+        "Neo4JStorage",
+        "RedisDocStatusStorage",
+    ),
 }
 
 

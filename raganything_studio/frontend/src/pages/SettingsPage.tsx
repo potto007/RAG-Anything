@@ -54,6 +54,7 @@ type StoragePresetKey =
   | 'opensearch'
   | 'neo4j'
   | 'memgraph'
+  | 'redisMilvusNeo4j'
 type StorageLayerKey = 'kv' | 'vector' | 'graph' | 'docStatus'
 type StorageLocationKey =
   | 'local'
@@ -353,6 +354,14 @@ const STORAGE_PRESETS: Record<StoragePresetKey, StoragePreset> = {
     vector_storage: 'NanoVectorDBStorage',
     graph_storage: 'MemgraphStorage',
     doc_status_storage: 'JsonDocStatusStorage',
+  },
+  redisMilvusNeo4j: {
+    label: 'Redis + Milvus + Neo4j',
+    description: 'Redis KV and doc status, Milvus vectors, Neo4j graph.',
+    kv_storage: 'RedisKVStorage',
+    vector_storage: 'MilvusVectorDBStorage',
+    graph_storage: 'Neo4JStorage',
+    doc_status_storage: 'RedisDocStatusStorage',
   },
 }
 
