@@ -684,7 +684,6 @@ export default function SettingsPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (form && !storagePresetForForm(form)) return
     saveMutation.mutate()
   }
 
@@ -700,7 +699,7 @@ export default function SettingsPage() {
   const selectedChannel = selectedProfile?.[selectedKind]
   const localStorageState = localStorageUsage(form)
   const currentStoragePreset = storagePresetForForm(form)
-  const storageComboError = currentStoragePreset ? null : unsupportedStorageMessage(form)
+  const storageComboWarning = currentStoragePreset ? null : 'Custom storage combination - not a recognized preset'
 
   return (
     <section className="page settings-page">
@@ -716,8 +715,7 @@ export default function SettingsPage() {
           <button
             className="button primary"
             form="studio-settings-form"
-            disabled={saveMutation.isPending || Boolean(storageComboError)}
-            title={storageComboError ?? undefined}
+            disabled={saveMutation.isPending}
           >
             <Save size={16} />
             {saveMutation.isPending ? 'Saving...' : 'Save Settings'}
@@ -925,13 +923,13 @@ export default function SettingsPage() {
                   <h2>Storage Backends</h2>
                   <p>Choose storage for KV metadata, vectors, graph, and document status. Each dropdown only shows options that still form a supported LightRAG layout.</p>
                 </div>
-                <span className="storage-current-pill">{currentStoragePreset?.label ?? 'Unsupported'}</span>
+                <span className="storage-current-pill">{currentStoragePreset?.label ?? 'Custom'}</span>
               </div>
 
-              {storageComboError ? (
+              {storageComboWarning ? (
                 <div className="storage-combo-warning">
                   <AlertTriangle size={15} />
-                  <span>{storageComboError}</span>
+                  <span>{storageComboWarning}</span>
                 </div>
               ) : null}
 
@@ -1202,7 +1200,7 @@ export default function SettingsPage() {
           )}
 
           {saveMutation.error ? <div className="error-panel">{saveMutation.error.message}</div> : null}
-          {storageComboError ? <div className="error-panel">{storageComboError}</div> : null}
+          {storageComboWarning ? <div className="gate-banner">{storageComboWarning}</div> : null}
           {saveMutation.isSuccess ? <div className="success-panel">Settings saved</div> : null}
         </form>
       </div>

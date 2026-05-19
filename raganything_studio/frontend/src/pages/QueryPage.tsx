@@ -304,7 +304,7 @@ export default function QueryPage() {
             <ParameterCheck label="Enable Rerank" checked={enableRerank} onChange={setEnableRerank} />
             <ParameterCheck label="Only Need Context" checked={onlyNeedContext} onChange={setOnlyNeedContext} />
             <ParameterCheck label="Only Need Prompt" checked={onlyNeedPrompt} onChange={setOnlyNeedPrompt} />
-            <ParameterCheck label="Stream Response" checked={streamResponse} onChange={setStreamResponse} />
+            <ParameterCheck label="Stream Response" checked={streamResponse} onChange={setStreamResponse} disabled title="Not yet supported by the backend" />
             <ParameterCheck label="Multimodal Enhancement" checked={useMultimodal} onChange={setUseMultimodal} />
           </aside>
         </div>
@@ -609,16 +609,18 @@ function ParameterNumber({
 }
 
 function ParameterCheck({
-  label, checked, onChange,
+  label, checked, onChange, disabled, title,
 }: {
   label: string
   checked: boolean
   onChange: (checked: boolean) => void
+  disabled?: boolean
+  title?: string
 }) {
   return (
-    <label className="param-check">
+    <label className="param-check" title={title}>
       <span>{label}</span>
-      <input checked={checked} type="checkbox" onChange={(event) => onChange(event.target.checked)} />
+      <input checked={checked} type="checkbox" disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
     </label>
   )
 }

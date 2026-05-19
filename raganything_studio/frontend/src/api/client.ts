@@ -57,7 +57,7 @@ export async function uploadDocument(file: File) {
   })
 }
 
-export async function processDocument(documentId: string, options: ProcessOptions) {
+export async function processDocument(documentId: string, options: Partial<ProcessOptions>) {
   return request<{ job_id: string; status: string }>(`/api/documents/${documentId}/process`, {
     body: JSON.stringify(options),
     method: 'POST',

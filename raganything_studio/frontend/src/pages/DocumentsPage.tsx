@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Activity, AlertCircle, BarChart3, Eye, FilePlus2, Loader2, RefreshCw, RotateCcw } from 'lucide-react'
-import { getDocuments } from '../api/client'
+import { Link, useNavigate } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertCircle, BarChart3, Eye, FilePlus2, Loader2, Play, RefreshCw } from 'lucide-react'
+import { getDocuments, processDocument } from '../api/client'
 import { StatusBadge } from '../components/StatusBadge'
 import type { DocumentRecord, DocumentStatus } from '../types/studio'
 
@@ -22,6 +22,8 @@ function docActionLink(doc: DocumentRecord): { to: string; title: string; label:
 }
 
 export default function DocumentsPage() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const { data: documents = [], isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['documents'],
@@ -29,6 +31,13 @@ export default function DocumentsPage() {
     refetchInterval: (query) => {
       const hasActive = (query.state.data ?? []).some((d) => d.status === 'processing')
       return hasActive ? 2000 : false
+    },
+  })
+  const retryMutation = useMutation({
+    mutationFn: (documentId: string) => processDocument(documentId, {}),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] })
+      navigate(`/jobs/${response.job_id}`)
     },
   })
   const counts = useMemo(() => countDocuments(documents), [documents])
@@ -45,19 +54,11 @@ export default function DocumentsPage() {
 
         <div className="documents-toolbar">
           <div className="documents-toolbar-group">
-            <button className="button" type="button" onClick={() => refetch()} disabled={isFetching}>
+            <button className="icon-button" type="button" onClick={() => refetch()} disabled={isFetching} title="Refresh document list">
               <RefreshCw size={16} className={isFetching ? 'spin' : ''} />
-              Scan
-            </button>
-            <button className="button" type="button">
-              <Activity size={16} />
-              Pipeline Status
             </button>
           </div>
           <div className="documents-toolbar-group">
-            <button className="icon-button" type="button" onClick={() => refetch()} disabled={isFetching} title="Refresh">
-              <RotateCcw size={16} className={isFetching ? 'spin' : ''} />
-            </button>
             <Link className="button primary" to="/documents/new">
               <FilePlus2 size={16} />
               Upload
@@ -109,15 +110,24 @@ export default function DocumentsPage() {
                     <span>{doc.chunks_count ?? '-'}</span>
                     <span>{new Date(doc.created_at).toLocaleString()}</span>
                     <span>{new Date(doc.updated_at).toLocaleString()}</span>
+                    <span className="doc-actions">
+                    {(doc.status === 'failed' || doc.status === 'uploaded') ? (
+                      <button
+                        className="icon-button doc-action-button"
+                        type="button"
+                        title={doc.status === 'failed' ? 'Retry processing' : 'Start processing'}
+                        disabled={retryMutation.isPending}
+                        onClick={() => retryMutation.mutate(doc.id)}
+                      >
+                        <Play size={16} />
+                      </button>
+                    ) : null}
                     {action ? (
                       <Link className="icon-button doc-action-button" to={action.to} title={action.title}>
                         <Eye size={16} />
                       </Link>
-                    ) : (
-                      <span className="icon-button icon-button--disabled" title="Not available">
-                        <Eye size={16} />
-                      </span>
-                    )}
+                    ) : null}
+                  </span>
                   </div>
                 )
               })}

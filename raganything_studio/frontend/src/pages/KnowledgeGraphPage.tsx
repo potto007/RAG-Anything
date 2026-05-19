@@ -87,6 +87,33 @@ type Selection =
   | { kind: 'node'; id: string; node: GraphNode }
   | { kind: 'edge'; id: string; edge: GraphEdge }
 
+// ── Camera controls (must live inside SigmaContainer) ───────────
+function CameraControls() {
+  const sigma = useSigma()
+  return (
+    <>
+      <button className="graph-icon-btn" title="Zoom in" onClick={() => {
+        const camera = sigma.getCamera()
+        camera.animatedZoom({ duration: 200 })
+      }}>
+        <ZoomIn size={15} />
+      </button>
+      <button className="graph-icon-btn" title="Zoom out" onClick={() => {
+        const camera = sigma.getCamera()
+        camera.animatedUnzoom({ duration: 200 })
+      }}>
+        <ZoomOut size={15} />
+      </button>
+      <button className="graph-icon-btn" title="Fit graph" onClick={() => {
+        const camera = sigma.getCamera()
+        camera.animatedReset({ duration: 300 })
+      }}>
+        <Maximize2 size={15} />
+      </button>
+    </>
+  )
+}
+
 // ── Inner controller (must live inside SigmaContainer) ────────────
 interface GraphControllerProps {
   graph: KnowledgeGraphResponse
@@ -541,15 +568,7 @@ export default function KnowledgeGraphPage() {
             <AlertTriangle size={15} />
           </button>
           <div className="graph-toolbar-sep" />
-          <button className="graph-icon-btn" title="Zoom in">
-            <ZoomIn size={15} />
-          </button>
-          <button className="graph-icon-btn" title="Zoom out">
-            <ZoomOut size={15} />
-          </button>
-          <button className="graph-icon-btn" title="Fit graph">
-            <Maximize2 size={15} />
-          </button>
+          <CameraControls />
           <div className="graph-toolbar-sep" />
           <button
             className={`graph-icon-btn${showNodeLabels ? ' active' : ''}`}
