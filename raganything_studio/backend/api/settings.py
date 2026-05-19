@@ -222,7 +222,7 @@ async def _test_vision(
     model: str, base_url: str | None, api_key: str | None, provider: str
 ) -> float:
     """
-    Test a vision model with a real multimodal message containing a 1×1 white PNG.
+    Test a vision model with a real multimodal message containing a small PNG.
     Plain text-only calls are rejected by most VLM endpoints (including Zhipu GLM-4V)
     with InvalidResponseError because they require an image content block.
     """
@@ -231,16 +231,16 @@ async def _test_vision(
     if not base_url:
         raise ValueError("No base URL configured for the vision provider")
 
-    # 1×1 white PNG, base64-encoded — smallest valid image that exercises the vision path
-    _WHITE_1X1_PNG = (
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8"
-        "z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg=="
+    # 8x8 red PNG, base64-encoded. Some providers reject 1x1 images as broken.
+    _TEST_PNG = (
+        "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP4"
+        "z8CAFWEXHbQSACj/P8Fu7N9hAAAAAElFTkSuQmCC"
     )
 
     image_url = (
         "https://cdn.bigmodel.cn/static/logo/register.png"
         if provider == "zhipu"
-        else f"data:image/png;base64,{_WHITE_1X1_PNG}"
+        else f"data:image/png;base64,{_TEST_PNG}"
     )
 
     payload = {
