@@ -132,7 +132,7 @@ class RAGAnythingService:
                     initializer = getattr(rag, "_ensure_lightrag_initialized", None)
                     if callable(initializer):
                         await initializer()
-                    _register_job_callback(rag, log, stats)
+                    _register_job_callback(rag, log, stats, set_progress)
                     _install_studio_optimizations(
                         rag=rag,
                         settings=self._settings,
@@ -913,7 +913,10 @@ def _parser_kwargs(options: ProcessOptions) -> dict[str, Any]:
 
 
 def _register_job_callback(
-    rag: Any, log: Callable[[str], None], stats: ProcessingStats
+    rag: Any,
+    log: Callable[[str], None],
+    stats: ProcessingStats,
+    set_progress: Callable[["JobStage", float, str], None] | None = None,
 ) -> None:
     try:
         from raganything.callbacks import ProcessingCallback
@@ -934,6 +937,8 @@ def _register_job_callback(
 
         def on_parse_start(self, file_path: str, parser: str = "", **_: Any) -> None:
             log(f"Started parsing {file_path} with {parser or 'configured parser'}")
+            if set_progress:
+                set_progress(JobStage.PARSING, 0.15, f"Parsing {Path(file_path).name}")
 
         def on_parse_complete(
             self,
@@ -945,9 +950,13 @@ def _register_job_callback(
             log(f"Parsed {file_path}: {content_blocks} content blocks")
             if duration_seconds is not None:
                 stats.add_duration("parse", duration_seconds)
+            if set_progress:
+                set_progress(JobStage.PARSING, 0.30, f"Parsed {content_blocks} content blocks")
 
         def on_text_insert_start(self, file_path: str, **_: Any) -> None:
             log(f"Building text index for {file_path}")
+            if set_progress:
+                set_progress(JobStage.BUILDING_INDEX, 0.35, "Inserting text and building index")
 
         def on_text_insert_complete(
             self,
@@ -958,11 +967,18 @@ def _register_job_callback(
             log(f"Text index complete for {file_path}")
             if duration_seconds is not None:
                 stats.add_duration("index_insert", duration_seconds)
+            if set_progress:
+                set_progress(JobStage.BUILDING_INDEX, 0.55, "Text index complete")
 
         def on_multimodal_start(
             self, file_path: str, item_count: int = 0, **_: Any
         ) -> None:
             log(f"Processing {item_count} multimodal items for {file_path}")
+            if set_progress:
+                set_progress(
+                    JobStage.BUILDING_INDEX, 0.60,
+                    f"Processing {item_count} multimodal items",
+                )
 
         def on_multimodal_item_complete(
             self,
@@ -976,6 +992,13 @@ def _register_job_callback(
                 f"Processed {item_type or 'multimodal'} item "
                 f"{item_index + 1}/{total_items} for {file_path}"
             )
+            if set_progress and total_items > 0:
+                frac = (item_index + 1) / total_items
+                progress = 0.60 + frac * 0.30
+                set_progress(
+                    JobStage.BUILDING_INDEX, progress,
+                    f"Multimodal {item_index + 1}/{total_items}",
+                )
 
         def on_multimodal_complete(
             self,
@@ -986,6 +1009,8 @@ def _register_job_callback(
             log(f"Multimodal processing complete for {file_path}")
             if duration_seconds is not None:
                 stats.add_duration("modal_processing", duration_seconds)
+            if set_progress:
+                set_progress(JobStage.BUILDING_INDEX, 0.90, "Multimodal processing complete")
 
         def on_document_complete(
             self,
