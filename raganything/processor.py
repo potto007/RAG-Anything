@@ -971,19 +971,23 @@ class ProcessorMixin:
             # Use full path or basename based on config
             file_ref = self._get_file_reference(file_path)
 
+            # Extract img_path so it survives as structured metadata
+            img_path = original_item.get("img_path", "")
+
             # Build LightRAG standard chunk format
             chunks[chunk_id] = {
-                "content": formatted_chunk_content,  # Now uses the templated content
+                "content": formatted_chunk_content,
                 "tokens": tokens,
                 "full_doc_id": doc_id,
                 "chunk_order_index": chunk_order_index,
                 "file_path": file_ref,
-                "llm_cache_list": [],  # LightRAG will populate this field
+                "llm_cache_list": [],
                 # Multimodal-specific metadata
                 "is_multimodal": True,
                 "modal_entity_name": entity_info["entity_name"],
                 "original_type": data["content_type"],
                 "page_idx": data["item_info"].get("page_idx", 0),
+                "img_path": img_path,
             }
 
         self.logger.debug(

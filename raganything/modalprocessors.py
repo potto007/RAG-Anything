@@ -470,6 +470,7 @@ class BaseModalProcessor:
         batch_mode: bool = False,
         doc_id: str = None,
         chunk_order_index: int = 0,
+        img_path: str = "",
     ) -> Tuple[str, Dict[str, Any]]:
         """Create entity and text chunk"""
         # Create chunk
@@ -483,8 +484,9 @@ class BaseModalProcessor:
             "tokens": tokens,
             "content": modal_chunk,
             "chunk_order_index": chunk_order_index,
-            "full_doc_id": actual_doc_id,  # Use proper document ID
+            "full_doc_id": actual_doc_id,
             "file_path": file_path,
+            "img_path": img_path,
         }
 
         # Store chunk
@@ -1000,11 +1002,11 @@ class ImageModalProcessor(BaseModalProcessor):
                 batch_mode,
                 doc_id,
                 chunk_order_index,
+                img_path=image_path,
             )
 
         except Exception as e:
             logger.error(f"Error processing image content: {e}")
-            # Fallback processing
             fallback_entity = {
                 "entity_name": entity_name
                 if entity_name
@@ -1174,12 +1176,11 @@ class TableModalProcessor(BaseModalProcessor):
             else:
                 content_data = modal_content
 
-            table_img_path = content_data.get("img_path")
+            table_img_path = content_data.get("img_path", "")
             table_caption = content_data.get("table_caption", [])
             table_body = content_data.get("table_body", "")
             table_footnote = content_data.get("table_footnote", [])
 
-            # Build complete table content
             modal_chunk = PROMPTS["table_chunk"].format(
                 table_img_path=table_img_path,
                 table_caption=", ".join(table_caption) if table_caption else "None",
@@ -1195,6 +1196,7 @@ class TableModalProcessor(BaseModalProcessor):
                 batch_mode,
                 doc_id,
                 chunk_order_index,
+                img_path=table_img_path,
             )
 
         except Exception as e:

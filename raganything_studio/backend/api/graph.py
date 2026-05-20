@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -23,7 +22,6 @@ from raganything_studio.backend.services.raganything_service import RAGAnythingS
 
 router = APIRouter()
 
-_IMG_PATH_RE = re.compile(r"'img_path':\s*'([^']+\.(png|jpg|jpeg|webp|gif))'", re.IGNORECASE)
 _ALLOWED_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 
@@ -277,9 +275,10 @@ async def get_node_media(
     img_path: Path | None = None
 
     def _extract_img_path(chunk: dict) -> Path | None:
-        content = chunk.get("content", "")
-        m = _IMG_PATH_RE.search(content)
-        return Path(m.group(1)) if m else None
+        stored = chunk.get("img_path")
+        if stored:
+            return Path(stored)
+        return None
 
     if source_id and source_id in chunks:
         img_path = _extract_img_path(chunks[source_id])

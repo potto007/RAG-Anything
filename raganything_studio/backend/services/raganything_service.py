@@ -39,11 +39,6 @@ _CURRENT_STATS: contextvars.ContextVar["ProcessingStats | None"] = (
     contextvars.ContextVar("raganything_studio_processing_stats", default=None)
 )
 
-_IMAGE_PATH_RE = re.compile(
-    r"(?:Image Path|图片路径|img_path|table_img_path|equation_img_path)['\"：: ]+"
-    r"['\"]?([^'\"\n\r,}]+\.(?:png|jpg|jpeg|webp|gif))",
-    re.IGNORECASE,
-)
 _ALLOWED_MEDIA_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 
@@ -1096,12 +1091,13 @@ def _build_query_artifacts(
 def _source_from_chunk(chunk: dict[str, Any], index: int) -> SourceItem:
     content = str(chunk.get("content") or "")
     file_path = str(chunk.get("file_path") or "")
-    source_type = _detect_source_type(content)
+    source_type = _detect_source_type(chunk)
     equation_info = _extract_equation_info(content) if source_type == "equation" else None
+    image_paths = _extract_image_paths(chunk)
     return SourceItem(
         document_id=_document_id_from_file_path(file_path),
         filename=Path(file_path).name if file_path else None,
-        page_idx=_page_index_from_content(content),
+        page_idx=chunk.get("page_idx") or _page_index_from_content(content),
         type=source_type,
         score=_safe_float(chunk.get("score")),
         preview=(
@@ -1114,7 +1110,7 @@ def _source_from_chunk(chunk: dict[str, Any], index: int) -> SourceItem:
             "chunk_id": chunk.get("chunk_id"),
             "reference_id": chunk.get("reference_id"),
             "file_path": file_path,
-            "image_paths": _extract_image_paths(content),
+            "image_paths": image_paths,
             "equation": equation_info,
         },
     )
@@ -1242,19 +1238,26 @@ def _media_url_for_path(path_value: str, settings: StudioSettings) -> str | None
     return f"/api/query/media?path={quote(str(resolved), safe='')}"
 
 
-def _detect_source_type(content: str) -> str:
-    lowered = content.lower()
-    if _extract_image_paths(content):
+def _detect_source_type(chunk: dict[str, Any]) -> str:
+    original_type = chunk.get("original_type")
+    if original_type:
+        return original_type
+    content_raw = str(chunk.get("content") or "")
+    content = content_raw.lower()
+    if chunk.get("img_path"):
         return "image"
-    if "table data" in lowered or "table:" in lowered or "表格" in content:
+    if "table data" in content or "table:" in content or "表格" in content_raw:
         return "table"
-    if "latex formula" in lowered or "mathematical equation" in lowered or "公式" in content:
+    if "latex formula" in content or "mathematical equation" in content or "公式" in content_raw:
         return "equation"
     return "text"
 
 
-def _extract_image_paths(content: str) -> list[str]:
-    return [match.strip() for match in _IMAGE_PATH_RE.findall(content)]
+def _extract_image_paths(chunk: dict[str, Any]) -> list[str]:
+    img_path = str(chunk.get("img_path") or "")
+    if img_path:
+        return [img_path]
+    return []
 
 
 def _preview_text(content: str, limit: int = 420) -> str:
